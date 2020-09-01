@@ -180,22 +180,28 @@ function dual_gen_feast!(Xr::AbstractMatrix, Xl::AbstractMatrix, A::AbstractMatr
     ZmA = similar(A, ComplexF64)
     nodes = size(contour.nodes, 1)
 
+
     if store
+        if debug print("Precomputing factorizations: ") end
          ZmA .= (A - B*contour.nodes[1])
          rfacts1 = factorizer(ZmA)
          rfacts = Array{typeof(rfacts1)}(undef, nodes)
          rfacts[1] = rfacts1
+         if debug print("1R ") end
          ZmA .= (A - B*contour.nodes[1])'
          lfacts1 = factorizer(ZmA)
          lfacts = Array{typeof(lfacts1)}(undef, nodes)
          lfacts[1] = lfacts1
-
-         Threads.@threads for i=2:nodes
+         if debug print("1L ") end
+         for i=2:nodes
                ZmA .= (A - B*contour.nodes[i])
                rfacts[i] = factorizer(ZmA)
+               if debug print("$(i)R ") end
                ZmA .= (A - B*contour.nodes[i])'
                lfacts[i] = factorizer(ZmA)
+               if debug print("$(i)L ") end
          end
+         if debug println() end
     end
 
     for nit=0:iter
@@ -255,12 +261,26 @@ function dual_gen_feast!(Xr::AbstractMatrix, Xl::AbstractMatrix, A::AbstractMatr
         foreach(finalize!, lfacts)
     end
     contour_nonempty = reduce(|, in_contour(Λ, contour))
-    if !contour_nonempty println("no eigenvalues found in contour!") end
-    Λ[in_contour(Λ, contour)], Xr[:,in_contour(Λ, contour)], Xl[:,in_contour(Λ, contour)], resr[in_contour(Λ, contour)]
+    Xr, Xl = Xr[:,in_contour(Λ, contour)], Xl[:,in_contour(Λ, contour)]
+    if !contour_nonempty
+        println("no eigenvalues found in contour!")
+    else
+        Xr, Xl = biortho(B, Xr, Xl)
+    end
+
+    Λ[in_contour(Λ, contour)], Xr, Xl, resr[in_contour(Λ, contour)]
 end
 
 function linsolve!(Y, C, X, factorizer, left_divider)
      F = factorizer(C)
      left_divider(Y, F, X)
      finalize!(F)
+end
+
+function biortho(B,Q,R)
+     Bq=R'*B*Q
+     (u,s,v)=svd(Bq)
+     Y=R*u*diagm( 0 => 1 ./sqrt.(s))
+     X=Q*v*diagm( 0 => 1 ./sqrt.(s))
+     return (X,Y)
 end
