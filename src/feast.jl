@@ -1,4 +1,4 @@
-import LinearAlgebra: qr, lu, eigen
+import LinearAlgebra: qr, lu, eigen, diag
 
 function feast!(X::AbstractMatrix, A::AbstractMatrix;
 				nodes::Integer=8, iter::Integer=10, c=complex(0.0,0.0), r=1.0, ϵ=1e-12,
@@ -268,13 +268,10 @@ function dual_gen_feast!(Xr::AbstractMatrix, Xl::AbstractMatrix, A::AbstractMatr
 	end
 
 	contour_nonempty = reduce(|, in_contour(Λ, contour))
-	Xr, Xl = Xr[:,in_contour(Λ, contour)], Xl[:,in_contour(Λ, contour)]
 	if !contour_nonempty
 		println("no eigenvalues found in contour!")
-	else
-		Xr, Xl = biortho(B, Xr, Xl)
 	end
-	output = Λ[in_contour(Λ, contour)], Xr, Xl, resr[in_contour(Λ, contour)]
+	output = Λ[in_contour(Λ, contour)], Xr[:,in_contour(Λ, contour)], Xl[:,in_contour(Λ, contour)], resr[in_contour(Λ, contour)]
 	return output
 	finally
 		if store
@@ -290,13 +287,7 @@ function linsolve!(Y, C, X, factorizer, left_divider)
 	finalize!(F)
 end
 
-function biortho(B,Q,R)
-	Bq=R'*B*Q
-	(u,s,v)=svd(Bq)
-	Y=R*u*diagm( 0 => 1 ./sqrt.(s))
-	X=Q*v*diagm( 0 => 1 ./sqrt.(s))
-	return (X,Y)
-end
+
 
 function init(Xr, Xl, N::Int, m₀::Int)
 	Λ, resolvent, resr, resl = zeros(ComplexF64, m₀), zeros(ComplexF64, m₀), zeros(m₀), zeros(m₀)
